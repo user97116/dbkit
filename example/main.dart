@@ -84,12 +84,30 @@ Future<void> main() async {
       await users.query().orderBy('age').paginate(page: 1, perPage: 2);
   print('page 1/${page.totalPages}: ${page.items} (total ${page.total})');
 
-  // 8. Transactions.
+  // 8. Exists checks + atomic counters.
+  print('has Ada: ${await users.existsWhere((w) => w.eq('name', 'Ada'))}');
+  await users.increment('age', where: (w) => w.eq('name', 'Ada'));
+  print('ada age: ${(await users.findOneWhere((w) => w.eq('name', 'Ada')))!['age']}');
+
+  // 9. Versioned migrations.
+  await db.migrate([
+    Migration(
+      version: 1,
+      description: 'add bio column',
+      run: (m) async {
+        await m.sql('ALTER TABLE "users" ADD COLUMN "bio" TEXT');
+      },
+    ),
+  ]);
+  await users.updateById(adaId, {'bio': 'pioneer'});
+  print('ada bio: ${(await users.findById(adaId))!['bio']}');
+
+  // 10. Transactions.
   await db.transaction((tx) async {
     final id = await tx.table('users').insert({'name': 'Tx', 'age': 20});
     await tx.table('posts').insert({'user_id': id, 'title': 'tx post'});
   });
 
-  // 9. Typed codegen alternative: see example/blog/ (dbkit_gen output).
+  // 11. Typed codegen alternative: see example/blog/ (dbkit_gen output).
   await db.close();
 }
