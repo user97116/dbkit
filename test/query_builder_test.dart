@@ -7,25 +7,21 @@ void main() {
       expect(const Where().eq('age', 18).compile().sql, '"age" = ?');
       expect(const Where().eq('age', 18).compile().args, [18]);
       expect(const Where().gt('age', 18).compile().sql, '"age" > ?');
+      expect(const Where().eq('name', null).compile().sql, '"name" IS NULL');
       expect(
-          const Where().eq('name', null).compile().sql, '"name" IS NULL');
-      expect(const Where().ne('name', null).compile().sql,
-          '"name" IS NOT NULL');
+          const Where().ne('name', null).compile().sql, '"name" IS NOT NULL');
     });
 
     test('like / in / between / null', () {
-      expect(const Where().like('name', '%a%').compile().sql,
-          '"name" LIKE ?');
+      expect(const Where().like('name', '%a%').compile().sql, '"name" LIKE ?');
       expect(
-          const Where().inList('id', [1, 2]).compile().sql,
-          '"id" IN (?, ?)');
+          const Where().inList('id', [1, 2]).compile().sql, '"id" IN (?, ?)');
       expect(const Where().inList('id', []).compile().sql, '(1 = 0)');
       expect(const Where().notInList('id', []).compile().sql, '(1 = 1)');
       expect(const Where().between('age', 18, 30).compile().sql,
           '"age" BETWEEN ? AND ?');
       expect(const Where().isNull('x').compile().sql, '"x" IS NULL');
-      expect(const Where().isNotNull('x').compile().sql,
-          '"x" IS NOT NULL');
+      expect(const Where().isNotNull('x').compile().sql, '"x" IS NOT NULL');
     });
 
     test('and/or/not composition with operators', () {
@@ -57,8 +53,7 @@ void main() {
       expect(c.args, ['%x%']);
 
       // raw like() stays untouched (no ESCAPE) — the power-user hatch.
-      expect(const Where().like('name', '%a%').compile().sql,
-          '"name" LIKE ?');
+      expect(const Where().like('name', '%a%').compile().sql, '"name" LIKE ?');
     });
 
     test('contains escapes %, _ and backslash literally', () {
@@ -112,22 +107,23 @@ void main() {
       expect(c.sql.contains('SELECT DISTINCT'), isTrue);
       expect(c.sql.contains('LEFT JOIN "posts" ON (posts.user_id = users.id)'),
           isTrue);
-      expect(c.sql.contains('GROUP BY "users"."id"') ||
-          c.sql.contains('GROUP BY "users.id"') ||
-          c.sql.contains('GROUP BY'), isTrue);
+      expect(
+          c.sql.contains('GROUP BY "users"."id"') ||
+              c.sql.contains('GROUP BY "users.id"') ||
+              c.sql.contains('GROUP BY'),
+          isTrue);
     });
 
     test('insert / update / delete compile', () {
       final ins = compileInsert('users', {'name': 'Ada', 'age': 36});
-      expect(ins.sql,
-          'INSERT  INTO "users" ("name", "age") VALUES (?, ?)');
+      expect(ins.sql, 'INSERT  INTO "users" ("name", "age") VALUES (?, ?)');
       expect(ins.args, ['Ada', 36]);
 
       final up = compileUpsert('users', {'id': 1, 'name': 'Ada'});
       expect(up.sql.contains('ON CONFLICT'), isTrue);
 
-      final upd = compileUpdate(
-          'users', {'age': 37}, const Where().eq('id', 1));
+      final upd =
+          compileUpdate('users', {'age': 37}, const Where().eq('id', 1));
       expect(upd.sql, 'UPDATE "users" SET "age" = ? WHERE "id" = ?');
 
       final del = compileDelete('users', const Where().eq('id', 1));

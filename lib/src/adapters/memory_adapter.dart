@@ -52,8 +52,7 @@ class MemoryAdapter implements DbAdapter {
       if ((_autoId[table] ?? 0) < id) _autoId[table] = id;
     }
     // naive unique-id guard
-    if (r['id'] != null &&
-        _table(table).any((e) => e['id'] == r['id'])) {
+    if (r['id'] != null && _table(table).any((e) => e['id'] == r['id'])) {
       throw DbException('UNIQUE constraint failed: $table.id = ${r['id']}');
     }
     _table(table).add(r);
@@ -81,8 +80,7 @@ class MemoryAdapter implements DbAdapter {
       idx = rows.indexWhere((e) => e[key] == r[key]);
       // composite conflict keys
       if (onConflict.length > 1) {
-        idx = rows.indexWhere(
-            (e) => onConflict.every((k) => e[k] == r[k]));
+        idx = rows.indexWhere((e) => onConflict.every((k) => e[k] == r[k]));
       }
     }
     if (idx == -1) {
@@ -239,8 +237,7 @@ class MemoryAdapter implements DbAdapter {
     }
     if (t.startsWith('DELETE FROM')) {
       // Very small raw-delete fallback: DELETE FROM "x" (no WHERE) -> clear.
-      final m = RegExp(r'DELETE FROM\s+"?(\w+)"?',
-              caseSensitive: false)
+      final m = RegExp(r'DELETE FROM\s+"?(\w+)"?', caseSensitive: false)
           .firstMatch(sql);
       if (m != null && !sql.toUpperCase().contains('WHERE')) {
         _table(m.group(1)!).clear();
@@ -290,8 +287,7 @@ class MemoryAdapter implements DbAdapter {
 
   // -- helpers ---------------------------------------------------------------
 
-  Map<String, Object?> _unprefixed(
-      Map<String, Object?> row, String baseTable) {
+  Map<String, Object?> _unprefixed(Map<String, Object?> row, String baseTable) {
     // Rows may contain `table.col` keys after joins — expose short names too.
     final out = Map<String, Object?>.of(row);
     for (final e in row.entries) {
@@ -385,15 +381,14 @@ class MemoryAdapter implements DbAdapter {
     return (m.group(1)!, m.group(2)!);
   }
 
-  bool _equiHit(Map<String, Object?> l, Map<String, Object?> r,
-      (String, String) eq) {
+  bool _equiHit(
+      Map<String, Object?> l, Map<String, Object?> r, (String, String) eq) {
     Object? lv(String c) {
       final clean = c.replaceAll('"', '');
       if (clean.contains('.')) {
         final parts = clean.split('.');
         final t = parts.first, colName = parts.last;
-        if (l.containsKey(colName) &&
-            (t == '' || true)) {
+        if (l.containsKey(colName) && (t == '' || true)) {
           // ambiguous — try left first
         }
       }
@@ -407,22 +402,17 @@ class MemoryAdapter implements DbAdapter {
   List<Map<String, Object?>> _applyGroupBy(
       List<Map<String, Object?>> rows, SelectQuery q) {
     // Only meaningful when projection has aggregates; otherwise dedupe.
-    final hasAgg = q.columns
-        .any((c) => c.toUpperCase().contains('COUNT('));
+    final hasAgg = q.columns.any((c) => c.toUpperCase().contains('COUNT('));
     if (!hasAgg) {
       final seen = <String>{};
       return rows.where((r) {
-        final k = q.groupByColumns
-            .map((c) => '${_resolveCol(r, c)}')
-            .join('|');
+        final k = q.groupByColumns.map((c) => '${_resolveCol(r, c)}').join('|');
         return seen.add(k);
       }).toList();
     }
     final groups = <String, List<Map<String, Object?>>>{};
     for (final r in rows) {
-      final k = q.groupByColumns
-          .map((c) => '${_resolveCol(r, c)}')
-          .join('|');
+      final k = q.groupByColumns.map((c) => '${_resolveCol(r, c)}').join('|');
       groups.putIfAbsent(k, () => []).add(r);
     }
     final out = <Map<String, Object?>>[];
@@ -457,14 +447,12 @@ class MemoryAdapter implements DbAdapter {
       out = rows.map((r) {
         final m = <String, Object?>{};
         for (final c in cols) {
-          final aliasM =
-              RegExp(r'^(.*?)\s+AS\s+(\w+)$', caseSensitive: false)
-                  .firstMatch(c.trim());
+          final aliasM = RegExp(r'^(.*?)\s+AS\s+(\w+)$', caseSensitive: false)
+              .firstMatch(c.trim());
           if (aliasM != null) {
             final expr = aliasM.group(1)!.trim();
             final alias = aliasM.group(2)!;
-            if (RegExp(r'COUNT\s*\(', caseSensitive: false)
-                .hasMatch(expr)) {
+            if (RegExp(r'COUNT\s*\(', caseSensitive: false).hasMatch(expr)) {
               m[alias] = r[alias] ?? r['count'] ?? 0;
             } else {
               m[alias] = _resolveCol(r, expr);
@@ -487,8 +475,7 @@ class MemoryAdapter implements DbAdapter {
                 m[e.key.split('.').last] = e.value;
               }
             }
-          } else if (RegExp(r'COUNT\s*\(', caseSensitive: false)
-              .hasMatch(c)) {
+          } else if (RegExp(r'COUNT\s*\(', caseSensitive: false).hasMatch(c)) {
             m['count'] = r['count'] ?? rows.length;
           } else {
             final short = c.replaceAll('"', '').split('.').last;

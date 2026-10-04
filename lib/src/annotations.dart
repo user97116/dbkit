@@ -47,6 +47,7 @@ class DbTable {
   /// are created. The model must declare matching `DateTime?` fields.
   final bool timestamps;
 
+  /// Marks [name] as a table (with optional `timestamps` columns).
   const DbTable(this.name, {this.timestamps = false});
 }
 
@@ -99,6 +100,7 @@ class DbColumn {
   /// by codegen.
   final bool primaryKey;
 
+  /// Configures column mapping and constraints.
   const DbColumn({
     this.name,
     this.unique = false,
@@ -126,6 +128,7 @@ class DbId {
   /// DB column name override. Defaults to the field name.
   final String? name;
 
+  /// Marks an integer autoincrement primary key.
   const DbId({this.autoIncrement = true, this.name});
 }
 
@@ -149,6 +152,7 @@ class DbId {
 ///
 /// (`get hashCode` / `get runtimeType` overrides are always ignored.)
 class DbIgnore {
+  /// Excludes a computed member from codegen.
   const DbIgnore();
 }
 
@@ -170,6 +174,7 @@ class DbIndex {
   /// Creates a `UNIQUE` index.
   final bool unique;
 
+  /// Declares a secondary index over [columns].
   const DbIndex(this.columns, {this.name, this.unique = false});
 }
 
@@ -204,6 +209,7 @@ class HasMany {
   /// Default limit for eager loads.
   final int? limit;
 
+  /// Declares a one-to-many relation.
   const HasMany(
     this.target, {
     required this.name,
@@ -232,6 +238,7 @@ class HasOne {
   /// Key field on this model. Defaults to this table's primary-key field.
   final String? localKey;
 
+  /// Declares a one-to-one relation.
   const HasOne(
     this.target, {
     required this.name,
@@ -261,6 +268,7 @@ class BelongsTo {
   /// Key field on the target model. Defaults to its primary-key field.
   final String? targetKey;
 
+  /// Declares a many-to-one relation.
   const BelongsTo(
     this.target, {
     required this.name,
@@ -302,6 +310,7 @@ class BelongsToMany {
   /// Key field on the target model. Defaults to its primary-key field.
   final String? targetKey;
 
+  /// Declares a many-to-many relation via [pivot].
   const BelongsToMany(
     this.target, {
     required this.name,

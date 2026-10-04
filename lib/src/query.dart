@@ -3,25 +3,37 @@ import 'sql.dart';
 
 /// A JOIN clause.
 class Join {
+  /// Join kind (`INNER`, `LEFT`, ...).
   final String kind; // INNER, LEFT, RIGHT, CROSS, FULL
+
+  /// Joined table name.
   final String table;
+
+  /// Optional table alias.
   final String? alias;
+
+  /// Typed `ON` condition, if any.
   final Condition? onCond;
+
+  /// Raw SQL `ON` fragment, if any.
   final String? onRaw;
 
   const Join._(this.kind, this.table, {this.alias, this.onCond, this.onRaw});
 
-  factory Join.on(String kind, String table, Condition on,
-          {String? alias}) =>
+  /// Joins [table] with a typed [on] condition.
+  factory Join.on(String kind, String table, Condition on, {String? alias}) =>
       Join._(kind, table, onCond: on, alias: alias);
 
-  factory Join.raw(String kind, String table, String onSql,
-          {String? alias}) =>
+  /// Joins [table] with a raw SQL [onSql] condition.
+  factory Join.raw(String kind, String table, String onSql, {String? alias}) =>
       Join._(kind, table, onRaw: onSql, alias: alias);
 
-  String get fromFragment =>
-      alias == null ? quoteIdent(table) : '${quoteIdent(table)} AS ${quoteIdent(alias!)}';
+  /// The `FROM`-style fragment (`"table"` or `"table" AS "alias"`).
+  String get fromFragment => alias == null
+      ? quoteIdent(table)
+      : '${quoteIdent(table)} AS ${quoteIdent(alias!)}';
 
+  /// Compiles the `... JOIN ... ON ...` fragment.
   CompiledSql compile() {
     final b = StringBuffer('$kind JOIN $fromFragment');
     final args = <Object?>[];
@@ -36,12 +48,21 @@ class Join {
   }
 }
 
+/// An `ORDER BY` term.
 class Order {
+  /// Column to sort by.
   final String column;
+
+  /// Whether sorting is descending.
   final bool desc;
+
+  /// Null placement override, if any.
   final bool? nullsFirst;
+
+  /// Creates an ordering over [column].
   const Order(this.column, {this.desc = false, this.nullsFirst});
 
+  /// Compiles the `"col" ASC/DESC` fragment.
   String compile() {
     var s = '${quoteIdent(column)} ${desc ? 'DESC' : 'ASC'}';
     if (nullsFirst != null) s += nullsFirst! ? ' NULLS FIRST' : ' NULLS LAST';
@@ -62,7 +83,10 @@ class Order {
 ///   .get();
 /// ```
 class SelectQuery {
+  /// Queried table name.
   final String table;
+
+  /// Optional table alias.
   final String? alias;
 
   List<String> _columns = ['*'];
@@ -75,14 +99,17 @@ class SelectQuery {
   int? _limit;
   int? _offset;
 
+  /// Creates a select over [table], optionally aliased as [alias].
   SelectQuery(this.table, {this.alias});
 
   // -- projection -----------------------------------------------------------
+  /// Selects [columns] instead of `*`.
   SelectQuery select(List<String> columns) {
     _columns = List.of(columns);
     return this;
   }
 
+  /// Adds [columns] to the projection (replaces a bare `*`).
   SelectQuery selectAppend(List<String> columns) {
     if (_columns.length == 1 && _columns.first == '*') {
       _columns = List.of(columns);
@@ -92,81 +119,101 @@ class SelectQuery {
     return this;
   }
 
-  SelectQuery countAll({String as = 'count'}) =>
-      select(['COUNT(*) AS $as']);
+  /// Selects `COUNT(*) AS [as]`.
+  SelectQuery countAll({String as = 'count'}) => select(['COUNT(*) AS $as']);
 
+  /// Toggles `SELECT DISTINCT`.
   SelectQuery distinct([bool v = true]) {
     _distinct = v;
     return this;
   }
 
   // -- joins ----------------------------------------------------------------
+  /// Joins [table] with a typed [on] condition.
   SelectQuery join(String table, Condition on,
       {String kind = 'INNER', String? alias}) {
     _joins.add(Join.on(kind, table, on, alias: alias));
     return this;
   }
 
+  /// Joins [table] with a raw SQL [onSql] condition.
   SelectQuery joinRaw(String table, String onSql,
       {String kind = 'INNER', String? alias}) {
     _joins.add(Join.raw(kind, table, onSql, alias: alias));
     return this;
   }
 
+  /// `INNER JOIN [table] ON ([onSql])`.
   SelectQuery innerJoin(String table, String onSql, {String? alias}) =>
       joinRaw(table, onSql, kind: 'INNER', alias: alias);
+
+  /// `LEFT JOIN [table] ON ([onSql])`.
   SelectQuery leftJoin(String table, String onSql, {String? alias}) =>
       joinRaw(table, onSql, kind: 'LEFT', alias: alias);
+
+  /// `RIGHT JOIN [table] ON ([onSql])`.
   SelectQuery rightJoin(String table, String onSql, {String? alias}) =>
       joinRaw(table, onSql, kind: 'RIGHT', alias: alias);
+
+  /// `CROSS JOIN [table]`.
   SelectQuery crossJoin(String table) {
     _joins.add(Join.raw('CROSS', table, '', alias: null));
     return this;
   }
 
   // -- filtering --------------------------------------------------------------
+  /// Adds an `AND` filter [c].
   SelectQuery whereCond(Condition c) {
     _where = _where == null ? c : _where! & c;
     return this;
   }
 
+  /// Adds an `AND` filter built by [build].
   SelectQuery where(Condition Function(Where w) build) =>
       whereCond(build(const Where()));
 
+  /// Adds an `OR` filter built by [build].
   SelectQuery orWhere(Condition Function(Where w) build) {
     final c = build(const Where());
     _where = _where == null ? c : _where! | c;
     return this;
   }
 
+  /// `where` shortcut for `[column] = [value]`.
   SelectQuery whereEq(String column, Object? value) =>
       whereCond(const Where().eq(column, value));
 
+  /// Adds a raw SQL [fragment] filter with [args].
   SelectQuery whereRaw(String fragment, [List<Object?> args = const []]) =>
       whereCond(RawCondition(fragment, args));
 
   // -- grouping / ordering / paging -------------------------------------------
+  /// Adds `GROUP BY [columns]`.
   SelectQuery groupBy(List<String> columns) {
     _groupBys.addAll(columns);
     return this;
   }
 
+  /// Adds a `HAVING` filter [c].
   SelectQuery havingCond(Condition c) {
     _having = _having == null ? c : _having! & c;
     return this;
   }
 
+  /// Adds a `HAVING` filter built by [build].
   SelectQuery having(Condition Function(Where w) build) =>
       havingCond(build(const Where()));
 
-  SelectQuery orderBy(String column,
-      {bool desc = false, bool? nullsFirst}) {
+  /// Adds `ORDER BY [column]` (ascending, or descending with [desc]).
+  SelectQuery orderBy(String column, {bool desc = false, bool? nullsFirst}) {
     _orders.add(Order(column, desc: desc, nullsFirst: nullsFirst));
     return this;
   }
 
+  /// Adds `ORDER BY [column] DESC`.
   SelectQuery orderByDesc(String column) => orderBy(column, desc: true);
 
+  /// Adds `LIMIT [n]` (must be `>= 0`).
   SelectQuery limit(int n) {
     if (n < 0) {
       throw ArgumentError.value(n, 'n', 'must be >= 0');
@@ -175,6 +222,7 @@ class SelectQuery {
     return this;
   }
 
+  /// Adds `OFFSET [n]` (must be `>= 0`).
   SelectQuery offset(int n) {
     if (n < 0) {
       throw ArgumentError.value(n, 'n', 'must be >= 0');
@@ -183,6 +231,7 @@ class SelectQuery {
     return this;
   }
 
+  /// Selects page [page] (`>= 1`) with [perPage] (`>= 1`) rows.
   SelectQuery page(int page, int perPage) {
     if (page < 1) {
       throw ArgumentError.value(page, 'page', 'must be >= 1');
@@ -196,6 +245,7 @@ class SelectQuery {
   }
 
   // -- compile ------------------------------------------------------------------
+  /// Compiles the full `SELECT ...` statement.
   CompiledSql compile() {
     final sb = StringBuffer('SELECT ');
     if (_distinct) sb.write('DISTINCT ');
@@ -246,17 +296,35 @@ class SelectQuery {
   }
 
   // Exposed for adapters/tests.
+  /// The current `WHERE` predicate, if any.
   Condition? get whereCondition => _where;
+
+  /// The current `HAVING` predicate, if any.
   Condition? get havingCondition => _having;
+
+  /// Joins added so far.
   List<Join> get joins => List.unmodifiable(_joins);
+
+  /// Orderings added so far.
   List<Order> get orders => List.unmodifiable(_orders);
+
+  /// The `LIMIT`, if set.
   int? get limitValue => _limit;
+
+  /// The `OFFSET`, if set.
   int? get offsetValue => _offset;
+
+  /// The current projection.
   List<String> get columns => List.unmodifiable(_columns);
+
+  /// Whether `DISTINCT` is enabled.
   bool get isDistinct => _distinct;
+
+  /// The `GROUP BY` columns.
   List<String> get groupByColumns => List.unmodifiable(_groupBys);
 
   /// Deep-ish copy (conditions/joins are immutable, so shared refs are safe).
+  /// Copies this query (conditions/joins are immutable, so shared refs are safe).
   SelectQuery clone() {
     final q = SelectQuery(table, alias: alias)
       .._columns = List.of(_columns)
@@ -273,25 +341,24 @@ class SelectQuery {
 }
 
 /// Compiles `INSERT INTO ...` (single or multi-row).
+/// Compiles a single-row `INSERT INTO [table]` for [row].
 CompiledSql compileInsert(String table, Map<String, Object?> row,
     {bool orReplace = false, bool orIgnore = false}) {
   return compileInsertMany(table, [row],
       orReplace: orReplace, orIgnore: orIgnore);
 }
 
+/// Compiles a multi-row `INSERT INTO [table]` for [rows].
 CompiledSql compileInsertMany(String table, List<Map<String, Object?>> rows,
     {bool orReplace = false, bool orIgnore = false}) {
   if (rows.isEmpty) {
     throw ArgumentError.value(rows, 'rows', 'must not be empty');
   }
   if (rows.first.isEmpty) {
-    throw ArgumentError.value(
-        rows.first, 'rows', 'row maps must not be empty');
+    throw ArgumentError.value(rows.first, 'rows', 'row maps must not be empty');
   }
   final cols = rows.first.keys.toList();
-  final or = orReplace
-      ? 'OR REPLACE '
-      : (orIgnore ? 'OR IGNORE ' : '');
+  final or = orReplace ? 'OR REPLACE ' : (orIgnore ? 'OR IGNORE ' : '');
   final sb = StringBuffer(
       'INSERT $or INTO ${quoteIdent(table)} (${cols.map(quoteIdent).join(', ')}) VALUES ');
   final args = <Object?>[];
@@ -306,6 +373,7 @@ CompiledSql compileInsertMany(String table, List<Map<String, Object?>> rows,
 }
 
 /// Compiles `INSERT ... ON CONFLICT ... DO UPDATE/ NOTHING` (upsert).
+/// Compiles an upsert of [row] into [table], conflicting over [onConflict].
 CompiledSql compileUpsert(
   String table,
   Map<String, Object?> row, {
@@ -317,8 +385,7 @@ CompiledSql compileUpsert(
   final sb = StringBuffer(base.sql);
   final args = List<Object?>.of(base.args);
   if (onConflict.isEmpty) return base;
-  sb.write(
-      ' ON CONFLICT (${onConflict.map(quoteIdent).join(', ')})');
+  sb.write(' ON CONFLICT (${onConflict.map(quoteIdent).join(', ')})');
   final cols = row.keys.where((k) => !onConflict.contains(k)).toList();
   final toUpdate = updateColumns ?? (updateAll ? cols : cols);
   if (toUpdate.isEmpty) {
@@ -331,6 +398,7 @@ CompiledSql compileUpsert(
 }
 
 /// Compiles `UPDATE ... SET ... WHERE ...`.
+/// Compiles `UPDATE [table] SET ...` of [values], filtered by [where].
 CompiledSql compileUpdate(
     String table, Map<String, Object?> values, Condition? where) {
   if (values.isEmpty) {
@@ -349,6 +417,7 @@ CompiledSql compileUpdate(
 }
 
 /// Compiles an atomic `UPDATE ... SET col = col + ? WHERE ...`.
+/// Compiles `UPDATE [table] SET [column] = [column] + [by]`, filtered by [where].
 CompiledSql compileIncrement(
     String table, String column, num by, Condition? where) {
   final sb = StringBuffer(
@@ -363,6 +432,7 @@ CompiledSql compileIncrement(
 }
 
 /// Compiles `DELETE FROM ... WHERE ...`.
+/// Compiles `DELETE FROM [table]`, filtered by [where].
 CompiledSql compileDelete(String table, Condition? where) {
   final sb = StringBuffer('DELETE FROM ${quoteIdent(table)}');
   final args = <Object?>[];

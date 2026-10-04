@@ -17,10 +17,13 @@ import 'sql.dart';
 class TableRef {
   final DbAdapter _adapter;
   final RelationRegistry _relations;
+
+  /// The table this handle reads and writes.
   final String table;
   final bool Function()? _logSql;
   final void Function(String message)? _logger;
 
+  /// Creates a handle to [table] (see [Db.table]).
   TableRef(this._adapter, this.table, this._relations,
       {bool Function()? logSql, void Function(String message)? logger})
       : _logSql = logSql,
@@ -63,45 +66,59 @@ class TableRef {
     return row;
   }
 
+  /// `SELECT * FROM table WHERE ... LIMIT 1` (single row or null).
   Future<Map<String, Object?>?> findOneWhere(
       Condition Function(Where w) build) {
     return query().where(build).first();
   }
 
+  /// `SELECT * FROM table WHERE ...` (all matching rows).
   Future<List<Map<String, Object?>>> findWhere(
       Condition Function(Where w) build) {
     return query().where(build).get();
   }
 
   /// Chainable filter shortcut: `users.where((w) => w.gt('age', 18)).get()`.
-  TableQuery where(Condition Function(Where w) build) =>
-      query().where(build);
+  TableQuery where(Condition Function(Where w) build) => query().where(build);
 
+  /// `where` shortcut for `[column] = [value]`.
   TableQuery whereEq(String column, Object? value) =>
       query().where((w) => w.eq(column, value));
+
+  /// `where` shortcut for `[column] IN [values]`.
   TableQuery whereIn(String column, List<Object?> values) =>
       query().where((w) => w.inList(column, values));
-  TableQuery whereNull(String column) =>
-      query().where((w) => w.isNull(column));
+
+  /// `where` shortcut for `[column] IS NULL`.
+  TableQuery whereNull(String column) => query().where((w) => w.isNull(column));
+
+  /// `where` shortcut for `[column] IS NOT NULL`.
   TableQuery whereNotNull(String column) =>
       query().where((w) => w.isNotNull(column));
 
   /// `column` contains `part` — no `%` wildcards needed.
   TableQuery whereContains(String column, String part) =>
       query().where((w) => w.contains(column, part));
+
+  /// `column` starts with `prefix` — no wildcards needed.
   TableQuery whereStartsWith(String column, String prefix) =>
       query().where((w) => w.startsWith(column, prefix));
+
+  /// `column` ends with `suffix` — no wildcards needed.
   TableQuery whereEndsWith(String column, String suffix) =>
       query().where((w) => w.endsWith(column, suffix));
 
+  /// Counts rows, optionally filtered by [build].
   Future<int> count([Condition Function(Where w)? build]) async {
     if (build == null) return _adapter.count(table);
     return _adapter.count(table, build(const Where()));
   }
 
+  /// Whether any row matches [build].
   Future<bool> existsWhere(Condition Function(Where w) build) =>
       _adapter.exists(table, build(const Where()));
 
+  /// Whether the row with [id] exists.
   Future<bool> existsById(Object id, {String idColumn = 'id'}) =>
       _adapter.exists(table, const Where().eq(idColumn, id));
 
@@ -129,6 +146,7 @@ class TableRef {
 
   // -- writes -------------------------------------------------------------------
 
+  /// Inserts [row], returning the new row id.
   Future<int> insert(Map<String, Object?> row) {
     if (row.isEmpty) {
       throw ArgumentError.value(row, 'row', 'must not be empty');
@@ -136,6 +154,7 @@ class TableRef {
     return _adapter.insert(table, row);
   }
 
+  /// Inserts every row in [rows].
   Future<void> insertMany(List<Map<String, Object?>> rows) {
     for (final row in rows) {
       if (row.isEmpty) {
@@ -163,15 +182,16 @@ class TableRef {
     return {'id': id, ...row};
   }
 
+  /// Updates the row with [id] to [values], returning the affected count.
   Future<int> updateById(Object id, Map<String, Object?> values,
       {String idColumn = 'id'}) {
     if (values.isEmpty) {
       throw ArgumentError.value(values, 'values', 'must not be empty');
     }
-    return _adapter.update(
-        table, values, const Where().eq(idColumn, id));
+    return _adapter.update(table, values, const Where().eq(idColumn, id));
   }
 
+  /// Updates every row matching [build] to [values].
   Future<int> updateWhere(
       Condition Function(Where w) build, Map<String, Object?> values) {
     if (values.isEmpty) {
@@ -180,9 +200,11 @@ class TableRef {
     return _adapter.update(table, values, build(const Where()));
   }
 
+  /// Deletes the row with [id], returning the affected count.
   Future<int> deleteById(Object id, {String idColumn = 'id'}) =>
       _adapter.delete(table, const Where().eq(idColumn, id));
 
+  /// Deletes every row matching [build], returning the affected count.
   Future<int> deleteWhere(Condition Function(Where w) build) =>
       _adapter.delete(table, build(const Where()));
 
@@ -194,6 +216,7 @@ class TableRef {
         table, column, by, where == null ? null : where(const Where()));
   }
 
+  /// Atomically subtracts [by] from [column] on every matching row.
   Future<int> decrement(String column,
           {int by = 1, Condition Function(Where w)? where}) =>
       increment(column, by: -by, where: where);
@@ -208,10 +231,12 @@ class TableRef {
   TableQuery withRelations(List<String> relationNames) =>
       query().withRelations(relationNames);
 
+  /// Eager-loads a `hasMany` / many-to-many [relation] onto every row.
   TableQuery withMany(String relation,
           [void Function(SelectQuery q)? constrain]) =>
       query().withMany(relation, constrain);
 
+  /// Eager-loads a `hasOne` / `belongsTo` [relation] onto every row.
   TableQuery withOne(String relation,
           [void Function(SelectQuery q)? constrain]) =>
       query().withOne(relation, constrain);
@@ -285,8 +310,7 @@ class TableRef {
           }
       ];
     }
-    final q = SelectQuery(rel.toTable)
-        .where((w) => w.inList(rel.toKey, keys));
+    final q = SelectQuery(rel.toTable).where((w) => w.inList(rel.toKey, keys));
     if (rel.filter != null) q.whereCond(rel.filter!(const Where()));
     if (rel.orderByColumn != null) {
       q.orderBy(rel.orderByColumn!, desc: rel.orderDesc);
@@ -313,24 +337,26 @@ class TableRef {
   }
 
   Future<List<Map<String, Object?>>> _loadBelongsTo(
-      List<Map<String, Object?>> children, Relation rel, EagerLoad eager) async {
+      List<Map<String, Object?>> children,
+      Relation rel,
+      EagerLoad eager) async {
     final fks = children
         .map((c) => c[rel.fromKey])
         .where((k) => k != null)
         .toSet()
         .toList();
     if (fks.isEmpty) {
-      return [for (final c in children) {...c, rel.name: null}];
+      return [
+        for (final c in children) {...c, rel.name: null}
+      ];
     }
-    final q =
-        SelectQuery(rel.toTable).where((w) => w.inList(rel.toKey, fks));
+    final q = SelectQuery(rel.toTable).where((w) => w.inList(rel.toKey, fks));
     if (eager.constrain != null) eager.constrain!(q);
     _log(q.compile());
     final parents = await _adapter.select(q);
     final byKey = {for (final p in parents) '${p[rel.toKey]}': p};
     return [
-      for (final c in children)
-        {...c, rel.name: byKey['${c[rel.fromKey]}']}
+      for (final c in children) {...c, rel.name: byKey['${c[rel.fromKey]}']}
     ];
   }
 
@@ -342,7 +368,9 @@ class TableRef {
         .toSet()
         .toList();
     if (keys.isEmpty) {
-      return [for (final p in parents) {...p, rel.name: []}];
+      return [
+        for (final p in parents) {...p, rel.name: []}
+      ];
     }
     final pivotQ = SelectQuery(rel.pivotTable!)
         .where((w) => w.inList(rel.pivotFromKey!, keys));
@@ -355,8 +383,8 @@ class TableRef {
         .toList();
     Map<String, Map<String, Object?>> byId = {};
     if (targetIds.isNotEmpty) {
-      final tq = SelectQuery(rel.toTable)
-          .where((w) => w.inList(rel.toKey, targetIds));
+      final tq =
+          SelectQuery(rel.toTable).where((w) => w.inList(rel.toKey, targetIds));
       if (rel.filter != null) tq.whereCond(rel.filter!(const Where()));
       if (eager.constrain != null) eager.constrain!(tq);
       _log(tq.compile());
@@ -392,125 +420,161 @@ class TableQuery {
   TableQuery._(this._table, this._select);
 
   // -- projection ---------------------------------------------------------
+  /// Selects [columns] instead of `*`.
   TableQuery select(List<String> columns) {
     _select.select(columns);
     return this;
   }
 
+  /// Adds [columns] to the projection (replaces a bare `*`).
   TableQuery selectAppend(List<String> columns) {
     _select.selectAppend(columns);
     return this;
   }
 
+  /// Toggles `SELECT DISTINCT`.
   TableQuery distinct([bool v = true]) {
     _select.distinct(v);
     return this;
   }
 
   // -- joins --------------------------------------------------------------
+  /// Joins [table] with a typed [on] condition.
   TableQuery join(String table, Condition on,
       {String kind = 'INNER', String? alias}) {
     _select.join(table, on, kind: kind, alias: alias);
     return this;
   }
 
+  /// Joins [table] with a raw SQL [onSql] condition.
   TableQuery joinRaw(String table, String onSql,
       {String kind = 'INNER', String? alias}) {
     _select.joinRaw(table, onSql, kind: kind, alias: alias);
     return this;
   }
 
+  /// `INNER JOIN [table] ON ([onSql])`.
   TableQuery innerJoin(String table, String onSql, {String? alias}) =>
       joinRaw(table, onSql, kind: 'INNER', alias: alias);
+
+  /// `LEFT JOIN [table] ON ([onSql])`.
   TableQuery leftJoin(String table, String onSql, {String? alias}) =>
       joinRaw(table, onSql, kind: 'LEFT', alias: alias);
 
   // -- filters --------------------------------------------------------------
+  /// Adds an `AND` filter built by [build].
   TableQuery where(Condition Function(Where w) build) {
     _select.where(build);
     return this;
   }
 
+  /// Adds an `AND` filter [c].
   TableQuery whereCond(Condition c) {
     _select.whereCond(c);
     return this;
   }
 
+  /// Adds an `OR` filter built by [build].
   TableQuery orWhere(Condition Function(Where w) build) {
     _select.orWhere(build);
     return this;
   }
 
+  /// `where` shortcut for `[column] = [value]`.
   TableQuery whereEq(String column, Object? value) =>
       where((w) => w.eq(column, value));
+
+  /// `where` shortcut for `[column] IN [values]`.
   TableQuery whereIn(String column, List<Object?> values) =>
       where((w) => w.inList(column, values));
+
+  /// `where` shortcut for `[column] BETWEEN [lo] AND [hi]`.
   TableQuery whereBetween(String column, Object? lo, Object? hi) =>
       where((w) => w.between(column, lo, hi));
+
+  /// `where` shortcut for `[column] IS NULL`.
   TableQuery whereNull(String column) => where((w) => w.isNull(column));
-  TableQuery whereNotNull(String column) =>
-      where((w) => w.isNotNull(column));
+
+  /// `where` shortcut for `[column] IS NOT NULL`.
+  TableQuery whereNotNull(String column) => where((w) => w.isNotNull(column));
+
+  /// `where` shortcut for raw `LIKE [pattern]`.
   TableQuery whereLike(String column, String pattern) =>
       where((w) => w.like(column, pattern));
 
   /// `column` contains `part` — no `%` wildcards needed.
   TableQuery whereContains(String column, String part) =>
       where((w) => w.contains(column, part));
+
+  /// `column` starts with `prefix` — no wildcards needed.
   TableQuery whereStartsWith(String column, String prefix) =>
       where((w) => w.startsWith(column, prefix));
+
+  /// `column` ends with `suffix` — no wildcards needed.
   TableQuery whereEndsWith(String column, String suffix) =>
       where((w) => w.endsWith(column, suffix));
+
+  /// Adds a raw SQL [fragment] filter with [args] (sqlite backend only).
   TableQuery whereRaw(String fragment, [List<Object?> args = const []]) {
     _select.whereRaw(fragment, args);
     return this;
   }
 
   // -- grouping / ordering / paging -------------------------------------------
+  /// Adds `GROUP BY [columns]`.
   TableQuery groupBy(List<String> columns) {
     _select.groupBy(columns);
     return this;
   }
 
+  /// Adds a `HAVING` filter built by [build].
   TableQuery having(Condition Function(Where w) build) {
     _select.having(build);
     return this;
   }
 
-  TableQuery orderBy(String column,
-      {bool desc = false, bool? nullsFirst}) {
+  /// Adds `ORDER BY [column]` (ascending, or descending with [desc]).
+  TableQuery orderBy(String column, {bool desc = false, bool? nullsFirst}) {
     _select.orderBy(column, desc: desc, nullsFirst: nullsFirst);
     return this;
   }
 
+  /// Adds `ORDER BY [column] DESC`.
   TableQuery orderByDesc(String column) => orderBy(column, desc: true);
 
+  /// Adds `LIMIT [n]`.
   TableQuery limit(int n) {
     _select.limit(n);
     return this;
   }
 
+  /// Adds `OFFSET [n]`.
   TableQuery offset(int n) {
     _select.offset(n);
     return this;
   }
 
+  /// Selects page [page] with [perPage] rows.
   TableQuery page(int page, int perPage) {
     _select.page(page, perPage);
     return this;
   }
 
   // -- relations ---------------------------------------------------------------
+  /// Eager-loads [names] onto every returned row.
   TableQuery withRelations(List<String> names) {
     _eager.addAll(names.map((n) => EagerLoad(n)));
     return this;
   }
 
+  /// Eager-loads a `hasMany` / many-to-many [relation], optionally tweaked.
   TableQuery withMany(String relation,
       [void Function(SelectQuery q)? constrain]) {
     _eager.add(EagerLoad(relation, constrain));
     return this;
   }
 
+  /// Eager-loads a `hasOne` / `belongsTo` [relation], optionally tweaked.
   TableQuery withOne(String relation,
       [void Function(SelectQuery q)? constrain]) {
     _eager.add(EagerLoad(relation, constrain));
@@ -518,24 +582,28 @@ class TableQuery {
   }
 
   // -- terminals -----------------------------------------------------------------
+  /// Runs the query, returning all matching rows (with eager loads applied).
   Future<List<Map<String, Object?>>> get() async {
     final rows = await _table._runSelect(_select);
     if (_eager.isEmpty) return rows;
     return _table._withEager(rows, _eager);
   }
 
+  /// Runs the query, returning the first row or null.
   Future<Map<String, Object?>?> first() async {
     _select.limit(1);
     final rows = await get();
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Runs the query, returning the first row or throwing [DbException].
   Future<Map<String, Object?>> firstOrFail() async {
     final r = await first();
     if (r == null) throw DbException('${_table.table}: no row found');
     return r;
   }
 
+  /// Counts matching rows (single `COUNT(*)` when no joins/grouping/eager).
   Future<int> count() async {
     // Fast path: a single COUNT(*) query. Only joins / grouping / eager
     // loads need the full fetch fallback to stay semantically identical.
@@ -549,19 +617,21 @@ class TableQuery {
     return rows.length;
   }
 
+  /// Whether any row matches.
   Future<bool> exists() async => await count() > 0;
 
+  /// Returns a single [column] across matching rows.
   Future<List<T>> pluck<T>(String column) async {
     final rows = await select([column]).get();
     return rows.map((r) => r[column] as T).toList();
   }
 
+  /// Paginates the query, returning a [Page] with total included.
   Future<Page> paginate({required int page, required int perPage}) async {
-    final total = await _table._adapter.count(
-        _table.table, _select.whereCondition);
-    final items = await TableQuery._(_table, _select.clone())
-        .page(page, perPage)
-        .get();
+    final total =
+        await _table._adapter.count(_table.table, _select.whereCondition);
+    final items =
+        await TableQuery._(_table, _select.clone()).page(page, perPage).get();
     return Page(items: items, page: page, perPage: perPage, total: total);
   }
 
@@ -571,17 +641,31 @@ class TableQuery {
 
 /// Paginated result.
 class Page {
+  /// Rows on this page.
   final List<Map<String, Object?>> items;
+
+  /// 1-based page number.
   final int page;
+
+  /// Rows per page.
   final int perPage;
+
+  /// Total matching rows across pages.
   final int total;
+
+  /// Creates a page of [items] ([page] of [perPage], [total] overall).
   const Page(
       {required this.items,
       required this.page,
       required this.perPage,
       required this.total});
 
+  /// Total page count.
   int get totalPages => (total / perPage).ceil();
+
+  /// Whether a next page exists.
   bool get hasNext => page < totalPages;
+
+  /// Whether a previous page exists.
   bool get hasPrev => page > 1;
 }

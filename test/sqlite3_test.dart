@@ -70,12 +70,10 @@ void main() {
     expect(await users.count(), 4);
 
     // transaction rollback
-    await expectLater(
-        db.transaction((tx) async {
-          await tx.table('users').insert({'name': 'Nope', 'age': 1});
-          throw Exception('boom');
-        }),
-        throwsException);
+    await expectLater(db.transaction((tx) async {
+      await tx.table('users').insert({'name': 'Nope', 'age': 1});
+      throw Exception('boom');
+    }), throwsException);
     expect(await users.count(), 4);
 
     // migrations
@@ -125,8 +123,7 @@ void main() {
       {'user_id': uid, 'title': 'b'},
     ]);
 
-    final users =
-        await db.table('users').withMany('posts').get();
+    final users = await db.table('users').withMany('posts').get();
     expect((users.first['posts'] as List).length, 2);
 
     final ps = await db.table('posts').withOne('author').get();

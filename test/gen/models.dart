@@ -29,10 +29,7 @@ class User {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is User &&
-          other.id == id &&
-          other.name == name &&
-          other.age == age;
+      other is User && other.id == id && other.name == name && other.age == age;
 
   @override
   int get hashCode => Object.hash(id, name, age);

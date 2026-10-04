@@ -2,9 +2,13 @@ import 'dart:convert';
 
 /// A compiled SQL statement + positional arguments (`?` placeholders).
 class CompiledSql {
+  /// The SQL text with `?` placeholders.
   final String sql;
+
+  /// Values bound to the placeholders, in order.
   final List<Object?> args;
 
+  /// Creates a compiled statement of [sql] with [args].
   const CompiledSql(this.sql, [this.args = const []]);
 
   @override

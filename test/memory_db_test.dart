@@ -98,12 +98,10 @@ void main() {
 
   test('transaction rolls back on error', () async {
     final users = db.table('users');
-    await expectLater(
-        db.transaction((tx) async {
-          await tx.table('users').insert({'name': 'Ada'});
-          throw Exception('boom');
-        }),
-        throwsException);
+    await expectLater(db.transaction((tx) async {
+      await tx.table('users').insert({'name': 'Ada'});
+      throw Exception('boom');
+    }), throwsException);
     expect(await users.count(), 0);
   });
 
@@ -118,17 +116,14 @@ void main() {
         await t.query().select(['cat']).distinct().orderBy('cat').get();
     expect(cats.length, 2);
 
-    final inRes =
-        await t.where((w) => w.inList('cat', ['a'])).get();
+    final inRes = await t.where((w) => w.inList('cat', ['a'])).get();
     expect(inRes.length, 2);
 
-    final btw =
-        await t.where((w) => w.between('price', 15, 25)).get();
+    final btw = await t.where((w) => w.between('price', 15, 25)).get();
     expect(btw.length, 1);
     expect(btw.first['name'], 'apricot');
 
-    final like =
-        await t.where((w) => w.like('name', 'ap%')).get();
+    final like = await t.where((w) => w.like('name', 'ap%')).get();
     expect(like.length, 2);
   });
 
@@ -153,7 +148,6 @@ void main() {
     expect(pct.first['name'], '100% juice');
 
     // negations
-    expect((await t.where((w) => w.notContains('name', 'ap')).get()).length,
-        2);
+    expect((await t.where((w) => w.notContains('name', 'ap')).get()).length, 2);
   });
 }

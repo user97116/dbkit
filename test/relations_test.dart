@@ -149,8 +149,12 @@ void main() {
   });
 
   test('belongsTo honors constrain', () async {
-    final rows = await db.table('posts').query().orderBy('id').withOne(
-        'author', (q) => q.where((w) => w.eq('name', 'Nobody'))).get();
+    final rows = await db
+        .table('posts')
+        .query()
+        .orderBy('id')
+        .withOne('author', (q) => q.where((w) => w.eq('name', 'Nobody')))
+        .get();
     expect(rows.every((r) => r['author'] == null), isTrue);
   });
 
@@ -158,7 +162,6 @@ void main() {
     await expectLater(
         db.table('users').withMany('nope').get(), throwsA(isA<Exception>()));
     await expectLater(
-        db.table('users').load({'id': 1}, 'nope'),
-        throwsA(isA<Exception>()));
+        db.table('users').load({'id': 1}, 'nope'), throwsA(isA<Exception>()));
   });
 }

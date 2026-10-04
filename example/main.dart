@@ -80,14 +80,14 @@ Future<void> main() async {
   print(await posts.load(draft!, 'author')); // belongsTo: Map?
 
   // 7. Pagination.
-  final page =
-      await users.query().orderBy('age').paginate(page: 1, perPage: 2);
+  final page = await users.query().orderBy('age').paginate(page: 1, perPage: 2);
   print('page 1/${page.totalPages}: ${page.items} (total ${page.total})');
 
   // 8. Exists checks + atomic counters.
   print('has Ada: ${await users.existsWhere((w) => w.eq('name', 'Ada'))}');
   await users.increment('age', where: (w) => w.eq('name', 'Ada'));
-  print('ada age: ${(await users.findOneWhere((w) => w.eq('name', 'Ada')))!['age']}');
+  print(
+      'ada age: ${(await users.findOneWhere((w) => w.eq('name', 'Ada')))!['age']}');
 
   // 9. Versioned migrations.
   await db.migrate([

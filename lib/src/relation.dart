@@ -2,7 +2,19 @@ import 'filter.dart';
 import 'query.dart';
 
 /// Relationship kinds.
-enum RelationKind { hasOne, hasMany, belongsTo, manyToMany }
+enum RelationKind {
+  /// One parent row -> one child row.
+  hasOne,
+
+  /// One parent row -> many child rows.
+  hasMany,
+
+  /// Many child rows -> one parent row.
+  belongsTo,
+
+  /// Many rows <-> many rows via a pivot table.
+  manyToMany
+}
 
 /// Declarative relationship between two tables.
 ///
@@ -16,22 +28,43 @@ enum RelationKind { hasOne, hasMany, belongsTo, manyToMany }
 /// // each user row gains `posts: [...]`
 /// ```
 class Relation {
+  /// Relation name — the key each row gains when eager-loaded.
   final String name;
+
+  /// The relationship kind.
   final RelationKind kind;
+
+  /// Parent table holding [fromKey].
   final String fromTable;
+
+  /// Key column on [fromTable].
   final String fromKey;
+
+  /// Child/target table holding [toKey].
   final String toTable;
+
+  /// Key column on [toTable].
   final String toKey;
 
   /// Pivot table for many-to-many (e.g. `post_tags`).
   final String? pivotTable;
+
+  /// Pivot column pointing at [fromTable].
   final String? pivotFromKey;
+
+  /// Pivot column pointing at [toTable].
   final String? pivotToKey;
 
   /// Optional default ordering / extra filter for eager loads.
   final Condition Function(Where w)? filter;
+
+  /// Default ordering column for eager loads.
   final String? orderByColumn;
+
+  /// Whether the default ordering is descending.
   final bool orderDesc;
+
+  /// Default row limit for eager loads.
   final int? limit;
 
   const Relation._({
@@ -140,8 +173,13 @@ class Relation {
 
 /// A pending eager-load: relation name + optional per-relation query tweak.
 class EagerLoad {
+  /// Relation name to load.
   final String relation;
+
+  /// Optional tweak applied to the relation's select (filter/order/limit).
   final void Function(SelectQuery q)? constrain;
+
+  /// Creates a pending load of [relation], optionally tweaked by [constrain].
   const EagerLoad(this.relation, [this.constrain]);
 }
 
@@ -149,16 +187,18 @@ class EagerLoad {
 class RelationRegistry {
   final Map<String, Map<String, Relation>> _byTable = {};
 
+  /// Registers [r], replacing any same-named relation on its table.
   void add(Relation r) {
     _byTable.putIfAbsent(r.fromTable, () => {})[r.name] = r;
   }
 
-  Relation? lookup(String fromTable, String name) =>
-      _byTable[fromTable]?[name];
+  /// Finds the relation [name] declared on [fromTable], if any.
+  Relation? lookup(String fromTable, String name) => _byTable[fromTable]?[name];
 
+  /// All relations declared on [fromTable].
   Map<String, Relation> of(String fromTable) =>
       Map.unmodifiable(_byTable[fromTable] ?? {});
 
-  Iterable<Relation> get all =>
-      _byTable.values.expand((m) => m.values);
+  /// Every registered relation, across tables.
+  Iterable<Relation> get all => _byTable.values.expand((m) => m.values);
 }

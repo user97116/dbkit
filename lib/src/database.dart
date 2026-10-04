@@ -24,7 +24,11 @@ import 'table.dart';
 class Db {
   final DbAdapter _adapter;
   final RelationRegistry _relations = RelationRegistry();
+
+  /// When true, compiled SQL is printed via [logger].
   bool logSql = false;
+
+  /// Receives SQL logs when [logSql] is true. Defaults to `print`.
   void Function(String message)? logger = print;
 
   Db._(this._adapter);
@@ -60,6 +64,7 @@ class Db {
     return db;
   }
 
+  /// The underlying storage backend.
   DbAdapter get adapter => _adapter;
 
   bool _isLog() => logSql;
@@ -81,8 +86,8 @@ class Db {
   ///   t.timestamps();
   /// });
   /// ```
-  Future<void> createTable(String name,
-      void Function(TableBlueprint t) build) async {
+  Future<void> createTable(
+      String name, void Function(TableBlueprint t) build) async {
     _requireTableName(name);
     final t = TableBlueprint(name);
     build(t);
@@ -96,11 +101,13 @@ class Db {
     }
   }
 
+  /// Drops [name] (`DROP TABLE`), keeping indexes untouched.
   Future<void> dropTable(String name, {bool ifExists = true}) async {
     await _adapter.execute(
         'DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}${quoteIdent(name)}');
   }
 
+  /// Creates index [name] over [columns] of [table].
   Future<void> createIndex(String name, String table, List<String> columns,
       {bool unique = false}) async {
     final u = unique ? 'UNIQUE ' : '';
@@ -108,6 +115,7 @@ class Db {
         'CREATE ${u}INDEX IF NOT EXISTS ${quoteIdent(name)} ON ${quoteIdent(table)} (${columns.map(quoteIdent).join(', ')})');
   }
 
+  /// Drops index [name] (`DROP INDEX IF EXISTS`).
   Future<void> dropIndex(String name) async {
     await _adapter.execute('DROP INDEX IF EXISTS ${quoteIdent(name)}');
   }
@@ -144,8 +152,7 @@ class Db {
   /// Handle to [name] with the full fluent API (`selectAll`, `findById`, ...).
   TableRef table(String name) {
     _requireTableName(name);
-    return TableRef(_adapter, name, _relations,
-        logSql: _isLog, logger: logger);
+    return TableRef(_adapter, name, _relations, logSql: _isLog, logger: logger);
   }
 
   static void _requireTableName(String name) {
@@ -157,6 +164,7 @@ class Db {
   /// Declares a named relationship used by `withMany` / `withOne` / `withRelations`.
   void defineRelation(Relation r) => _relations.add(r);
 
+  /// Declares every relationship in [rs] (see [defineRelation]).
   void defineRelations(Iterable<Relation> rs) {
     for (final r in rs) {
       _relations.add(r);
@@ -197,5 +205,6 @@ class Db {
   Future<void> exec(String sql, [List<Object?> args = const []]) =>
       _adapter.execute(sql, args);
 
+  /// Releases backend resources. Idempotent.
   Future<void> close() => _adapter.close();
 }

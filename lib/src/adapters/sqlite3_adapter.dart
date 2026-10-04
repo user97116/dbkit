@@ -18,19 +18,21 @@ class Sqlite3Adapter implements DbAdapter {
 
   Sqlite3Adapter._(this._db);
 
+  /// In-memory backend (real SQL engine, ephemeral).
   factory Sqlite3Adapter.memory() {
     final adapter = Sqlite3Adapter._(sqlite.sqlite3.openInMemory());
     adapter._applyPragmas(journalWal: false);
     return adapter;
   }
 
+  /// File-backed backend at [path] (WAL mode applied).
   factory Sqlite3Adapter.open(String path) {
     final adapter = Sqlite3Adapter._(sqlite.sqlite3.open(path));
     adapter._applyPragmas(journalWal: true);
     return adapter;
   }
 
-  /// Wrap an existing `sqlite3` database (e.g. shared connection).
+  /// Wraps an existing `sqlite3` database (e.g. shared connection).
   ///
   /// Pragmas are NOT applied here — the owner of the connection decides.
   factory Sqlite3Adapter.wrap(Object db) =>
@@ -70,7 +72,7 @@ class Sqlite3Adapter implements DbAdapter {
         final rs = stmt.select(args.map(toSqlValue).toList());
         return _rows(rs);
       } finally {
-        stmt.dispose();
+        stmt.close();
       }
     } catch (e) {
       throw DbException('select failed: $e', cause: e, sql: sql);
@@ -85,12 +87,11 @@ class Sqlite3Adapter implements DbAdapter {
       try {
         stmt.execute(c.args.map(toSqlValue).toList());
       } finally {
-        stmt.dispose();
+        stmt.close();
       }
       return _db.lastInsertRowId;
     } catch (e) {
-      throw DbException('insert into $table failed: $e',
-          cause: e, sql: c.sql);
+      throw DbException('insert into $table failed: $e', cause: e, sql: c.sql);
     }
   }
 
@@ -112,8 +113,7 @@ class Sqlite3Adapter implements DbAdapter {
     try {
       _db.execute(c.sql, c.args.map(toSqlValue).toList());
     } catch (e) {
-      throw DbException('upsert into $table failed: $e',
-          cause: e, sql: c.sql);
+      throw DbException('upsert into $table failed: $e', cause: e, sql: c.sql);
     }
   }
 
@@ -137,8 +137,8 @@ class Sqlite3Adapter implements DbAdapter {
       _db.execute(c.sql, c.args.map(toSqlValue).toList());
       return _db.updatedRows;
     } catch (e) {
-      throw DbException(
-          'increment $column in $table failed: $e', cause: e, sql: c.sql);
+      throw DbException('increment $column in $table failed: $e',
+          cause: e, sql: c.sql);
     }
   }
 
@@ -149,8 +149,7 @@ class Sqlite3Adapter implements DbAdapter {
       _db.execute(c.sql, c.args.map(toSqlValue).toList());
       return _db.updatedRows;
     } catch (e) {
-      throw DbException('delete from $table failed: $e',
-          cause: e, sql: c.sql);
+      throw DbException('delete from $table failed: $e', cause: e, sql: c.sql);
     }
   }
 
@@ -219,6 +218,6 @@ class Sqlite3Adapter implements DbAdapter {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    _db.dispose();
+    _db.close();
   }
 }

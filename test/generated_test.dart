@@ -54,7 +54,8 @@ void _suite(Db Function() make) {
     );
     expect(adults.map((u) => u.name), ['Cid', 'Ada']);
 
-    final found = await db.users.findOne((w) => w.contains(UserColumns.name, 'o'));
+    final found =
+        await db.users.findOne((w) => w.contains(UserColumns.name, 'o'));
     expect(found!.name, 'Bob');
   });
 

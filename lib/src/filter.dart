@@ -12,6 +12,7 @@ import 'sql.dart';
 sealed class Condition {
   const Condition();
 
+  /// Compiles this predicate to SQL + bound arguments.
   CompiledSql compile();
 
   /// Evaluates this predicate against an in-memory [row].
@@ -19,11 +20,19 @@ sealed class Condition {
   /// cannot be evaluated and throw [UnsupportedError].
   bool test(Map<String, Object?> row);
 
+  /// Combines with [other] via `AND`.
   Condition operator &(Condition other) => AndCondition([this, other]);
+
+  /// Combines with [other] via `OR`.
   Condition operator |(Condition other) => OrCondition([this, other]);
+
+  /// Negates this predicate (`NOT ...`).
   Condition operator ~() => NotCondition(this);
 
+  /// Combines [parts] via `AND`.
   static Condition and(List<Condition> parts) => AndCondition(parts);
+
+  /// Combines [parts] via `OR`.
   static Condition or(List<Condition> parts) => OrCondition(parts);
 }
 
@@ -45,6 +54,8 @@ class _False extends Condition {
 
 /// Matches everything / nothing. Useful for dynamic filters.
 const Condition alwaysTrue = _True();
+
+/// Matches nothing. Useful for dynamic filters.
 const Condition alwaysFalse = _False();
 
 Object? _resolve(String column, Map<String, Object?> row) {
@@ -104,10 +115,8 @@ bool _likeMatch(String? value, String pattern, {bool escaped = false}) {
 /// ```dart
 /// users.where((w) => w.contains('name', 'a')).get(); // no `%a%` needed
 /// ```
-String escapeLike(String input) => input
-    .replaceAll(r'\', r'\\')
-    .replaceAll('%', r'\%')
-    .replaceAll('_', r'\_');
+String escapeLike(String input) =>
+    input.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
 
 class _Simple extends Condition {
   final String column;
@@ -123,8 +132,7 @@ class _Simple extends Condition {
         return CompiledSql('${quoteIdent(column)} IS NOT NULL');
       }
     }
-    return CompiledSql(
-        '${quoteIdent(column)} $op ?', [toSqlValue(value)]);
+    return CompiledSql('${quoteIdent(column)} $op ?', [toSqlValue(value)]);
   }
 
   @override
@@ -201,8 +209,8 @@ class _In extends Condition {
     }
     final ph = List.filled(values.length, '?').join(', ');
     final op = negated ? 'NOT IN' : 'IN';
-    return CompiledSql('${quoteIdent(column)} $op ($ph)',
-        values.map(toSqlValue).toList());
+    return CompiledSql(
+        '${quoteIdent(column)} $op ($ph)', values.map(toSqlValue).toList());
   }
 
   @override
@@ -231,8 +239,7 @@ class _Between extends Condition {
   bool test(Map<String, Object?> row) {
     final actual = _resolve(column, row);
     if (actual == null) return false;
-    final inRange =
-        _compare(actual, low) >= 0 && _compare(actual, high) <= 0;
+    final inRange = _compare(actual, low) >= 0 && _compare(actual, high) <= 0;
     return negated ? !inRange : inRange;
   }
 }
@@ -255,8 +262,13 @@ class _Null extends Condition {
 
 /// Raw SQL fragment, e.g. `RawCondition('price * qty > ?', [100])`.
 class RawCondition extends Condition {
+  /// SQL fragment with `?` placeholders.
   final String fragment;
+
+  /// Values bound to the placeholders.
   final List<Object?> args;
+
+  /// Creates a raw fragment [fragment] with [args].
   const RawCondition(this.fragment, [this.args = const []]);
 
   @override
@@ -267,8 +279,12 @@ class RawCondition extends Condition {
       'RawCondition cannot be evaluated in-memory: $fragment');
 }
 
+/// Conjunction of [parts] (`a AND b AND ...`).
 class AndCondition extends Condition {
+  /// Conjuncts.
   final List<Condition> parts;
+
+  /// Creates a conjunction over [parts].
   const AndCondition(this.parts);
 
   @override
@@ -293,8 +309,12 @@ class AndCondition extends Condition {
   bool test(Map<String, Object?> row) => parts.every((p) => p.test(row));
 }
 
+/// Disjunction of [parts] (`a OR b OR ...`).
 class OrCondition extends Condition {
+  /// Disjuncts.
   final List<Condition> parts;
+
+  /// Creates a disjunction over [parts].
   const OrCondition(this.parts);
 
   @override
@@ -319,8 +339,12 @@ class OrCondition extends Condition {
   bool test(Map<String, Object?> row) => parts.any((p) => p.test(row));
 }
 
+/// Negation of [inner] (`NOT ...`).
 class NotCondition extends Condition {
+  /// The negated predicate.
   final Condition inner;
+
+  /// Creates a negation of [inner].
   const NotCondition(this.inner);
 
   @override
@@ -339,22 +363,32 @@ class NotCondition extends Condition {
 /// w.eq('active', true) & (w.lt('age', 13) | w.gt('age', 19))
 /// ```
 class Where {
+  /// Creates a predicate builder.
   const Where();
 
+  /// `[column] = [value]` (`IS NULL` when [value] is null).
   Condition eq(String column, Object? value) => _Simple(column, '=', value);
-  Condition ne(String column, Object? value) =>
-      _Simple(column, '!=', value);
+
+  /// `[column] != [value]` (`IS NOT NULL` when [value] is null).
+  Condition ne(String column, Object? value) => _Simple(column, '!=', value);
+
+  /// `[column] > [value]`.
   Condition gt(String column, Object? value) => _Simple(column, '>', value);
-  Condition gte(String column, Object? value) =>
-      _Simple(column, '>=', value);
+
+  /// `[column] >= [value]`.
+  Condition gte(String column, Object? value) => _Simple(column, '>=', value);
+
+  /// `[column] < [value]`.
   Condition lt(String column, Object? value) => _Simple(column, '<', value);
-  Condition lte(String column, Object? value) =>
-      _Simple(column, '<=', value);
+
+  /// `[column] <= [value]`.
+  Condition lte(String column, Object? value) => _Simple(column, '<=', value);
 
   /// Raw `LIKE` with your own `%`/`_` wildcards. Prefer [contains],
   /// [startsWith] or [endsWith] for plain text — they escape wildcards.
-  Condition like(String column, String pattern) =>
-      _Like(column, pattern);
+  Condition like(String column, String pattern) => _Like(column, pattern);
+
+  /// Raw `NOT LIKE` with your own `%`/`_` wildcards.
   Condition notLike(String column, String pattern) =>
       _Like(column, pattern, negated: true);
 
@@ -362,34 +396,49 @@ class Where {
   /// Special chars (`%`, `_`, `\`) in [part] match literally.
   Condition contains(String column, String part) =>
       _Like(column, '%${escapeLike(part)}%', escaped: true);
+
+  /// `name` does not contain `part` (literal match, no wildcards needed).
   Condition notContains(String column, String part) =>
       _Like(column, '%${escapeLike(part)}%', negated: true, escaped: true);
 
   /// `name` starts with `prefix` — no `prefix%` needed.
   Condition startsWith(String column, String prefix) =>
       _Like(column, '${escapeLike(prefix)}%', escaped: true);
+
+  /// `name` does not start with `prefix` (literal match).
   Condition notStartsWith(String column, String prefix) =>
       _Like(column, '${escapeLike(prefix)}%', negated: true, escaped: true);
 
   /// `name` ends with `suffix` — no `%suffix` needed.
   Condition endsWith(String column, String suffix) =>
       _Like(column, '%${escapeLike(suffix)}', escaped: true);
+
+  /// `name` does not end with `suffix` (literal match).
   Condition notEndsWith(String column, String suffix) =>
       _Like(column, '%${escapeLike(suffix)}', negated: true, escaped: true);
 
-  Condition inList(String column, List<Object?> values) =>
-      _In(column, values);
+  /// `[column] IN [values]` (empty folds to false).
+  Condition inList(String column, List<Object?> values) => _In(column, values);
+
+  /// `[column] NOT IN [values]` (empty folds to true).
   Condition notInList(String column, List<Object?> values) =>
       _In(column, values, negated: true);
 
+  /// `[column] BETWEEN [low] AND [high]`.
   Condition between(String column, Object? low, Object? high) =>
       _Between(column, low, high);
+
+  /// `[column] NOT BETWEEN [low] AND [high]`.
   Condition notBetween(String column, Object? low, Object? high) =>
       _Between(column, low, high, negated: true);
 
+  /// `[column] IS NULL`.
   Condition isNull(String column) => _Null(column);
+
+  /// `[column] IS NOT NULL`.
   Condition isNotNull(String column) => _Null(column, negated: true);
 
+  /// Raw SQL [fragment] with [args] (sqlite backend only).
   Condition raw(String fragment, [List<Object?> args = const []]) =>
       RawCondition(fragment, args);
 }
@@ -399,40 +448,78 @@ class Where {
 /// ```dart
 /// col('age').gt(18) & col('name').contains('a')
 /// ```
+/// Same filters as [Where], with the column bound once.
 ColumnRef col(String name) => ColumnRef(name);
 
+/// A column-bound predicate builder (see [col]).
 class ColumnRef {
+  /// The bound column name.
   final String name;
+
+  /// Creates a reference to column [name].
   const ColumnRef(this.name);
 
+  /// `[name] = [v]`.
   Condition eq(Object? v) => _Simple(name, '=', v);
+
+  /// `[name] != [v]`.
   Condition ne(Object? v) => _Simple(name, '!=', v);
+
+  /// `[name] > [v]`.
   Condition gt(Object? v) => _Simple(name, '>', v);
+
+  /// `[name] >= [v]`.
   Condition gte(Object? v) => _Simple(name, '>=', v);
+
+  /// `[name] < [v]`.
   Condition lt(Object? v) => _Simple(name, '<', v);
+
+  /// `[name] <= [v]`.
   Condition lte(Object? v) => _Simple(name, '<=', v);
 
   /// Raw `LIKE` with your own `%`/`_` wildcards. Prefer [contains],
   /// [startsWith] or [endsWith] for plain text.
   Condition like(String p) => _Like(name, p);
+
+  /// Raw `NOT LIKE` with your own `%`/`_` wildcards.
   Condition notLike(String p) => _Like(name, p, negated: true);
 
   /// Contains `part` — no `%` wildcards needed. `%`, `_`, `\` match literally.
   Condition contains(String p) =>
       _Like(name, '%${escapeLike(p)}%', escaped: true);
+
+  /// Does not contain `part` (literal match).
   Condition notContains(String p) =>
       _Like(name, '%${escapeLike(p)}%', negated: true, escaped: true);
+
+  /// Starts with `p` — no wildcards needed.
   Condition startsWith(String p) =>
       _Like(name, '${escapeLike(p)}%', escaped: true);
+
+  /// Does not start with `p` (literal match).
   Condition notStartsWith(String p) =>
       _Like(name, '${escapeLike(p)}%', negated: true, escaped: true);
+
+  /// Ends with `p` — no wildcards needed.
   Condition endsWith(String p) =>
       _Like(name, '%${escapeLike(p)}', escaped: true);
+
+  /// Does not end with `p` (literal match).
   Condition notEndsWith(String p) =>
       _Like(name, '%${escapeLike(p)}', negated: true, escaped: true);
+
+  /// `[name] IN [v]` (empty folds to false).
   Condition inList(List<Object?> v) => _In(name, v);
+
+  /// `[name] NOT IN [v]` (empty folds to true).
   Condition notInList(List<Object?> v) => _In(name, v, negated: true);
+
+  /// `[name] BETWEEN [lo] AND [hi]`.
   Condition between(Object? lo, Object? hi) => _Between(name, lo, hi);
+
+  /// `[name] IS NULL`.
   Condition isNull() => _Null(name);
+
+  /// `[name] IS NOT NULL`.
   Condition isNotNull() => _Null(name, negated: true);
 }

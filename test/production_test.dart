@@ -60,12 +60,12 @@ void main() {
       final users = db.table('users');
       final id = await users.insert({'name': 'Ada', 'age': 36});
       await users.insert({'name': 'Bob', 'age': 10});
-      final n = await users.increment('age',
-          by: 2, where: (w) => w.eq('id', id));
+      final n =
+          await users.increment('age', by: 2, where: (w) => w.eq('id', id));
       expect(n, 1);
       expect((await users.findById(id))!['age'], 38);
-      expect((await users.findOneWhere((w) => w.eq('name', 'Bob')))!['age'],
-          10);
+      expect(
+          (await users.findOneWhere((w) => w.eq('name', 'Bob')))!['age'], 10);
     });
 
     test('filtered count is correct without fetching rows', () async {
@@ -85,16 +85,15 @@ void main() {
         t.id();
         t.text('value').nullable();
       });
-      final id = await db
-          .table('prefs')
-          .insert({'value': toSqlValue({'theme': 'dark'})});
-      expect((await db.table('prefs').findById(id))!['value'],
-          '{"theme":"dark"}');
+      final id = await db.table('prefs').insert({
+        'value': toSqlValue({'theme': 'dark'})
+      });
+      expect(
+          (await db.table('prefs').findById(id))!['value'], '{"theme":"dark"}');
     });
 
     test('compileIncrement generates a single UPDATE', () {
-      final c = compileIncrement(
-          'users', 'age', 2, const Where().eq('id', 1));
+      final c = compileIncrement('users', 'age', 2, const Where().eq('id', 1));
       expect(c.sql, 'UPDATE "users" SET "age" = "age" + ? WHERE "id" = ?');
       expect(c.args, [2, 1]);
     });
@@ -103,14 +102,11 @@ void main() {
   group('fail-fast validation', () {
     test('empty rows and values throw ArgumentError', () async {
       final db = Db.fake();
-      expect(() => db.table('users').insert({}),
-          throwsA(isA<ArgumentError>()));
-      expect(() => db.table('users').upsert({}),
-          throwsA(isA<ArgumentError>()));
+      expect(() => db.table('users').insert({}), throwsA(isA<ArgumentError>()));
+      expect(() => db.table('users').upsert({}), throwsA(isA<ArgumentError>()));
       expect(() => db.table('users').updateById(1, {}),
           throwsA(isA<ArgumentError>()));
-      expect(() => compileInsert('users', {}),
-          throwsA(isA<ArgumentError>()));
+      expect(() => compileInsert('users', {}), throwsA(isA<ArgumentError>()));
       expect(() => compileUpdate('users', {}, null),
           throwsA(isA<ArgumentError>()));
     });
