@@ -1,0 +1,31 @@
+name: dbkit
+description: >-
+  Super-abstraction SQLite toolkit for Dart & Flutter. No raw SQL needed:
+  fluent Table APIs (selectAll, findById, insert, upsert...), chainable query
+  builder, relationships (hasMany/belongsTo/manyToMany with eager loading),
+  schema builder, migrations, transactions. Powered by sqlite3 with an
+  in-memory adapter for tests.
+version: 0.4.0
+repository: https://github.com/user97116/dbkit
+issue_tracker: https://github.com/user97116/dbkit/issues
+homepage: https://github.com/user97116/dbkit
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  sqlite3: ^2.4.0
+  meta: ^1.9.0
+
+dev_dependencies:
+  build_runner: ^2.4.0
+  dbkit_gen:
+    path: ../dbkit_gen
+  test: ^1.25.0
+  lints: ^5.0.0
+
+topics:
+  - sqlite
+  - database
+  - orm
+  - query-builder
