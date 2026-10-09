@@ -56,7 +56,12 @@ class MemoryAdapter implements DbAdapter {
       throw DbException('UNIQUE constraint failed: $table.id = ${r['id']}');
     }
     _table(table).add(r);
-    return (r['id'] as num?)?.toInt() ?? 0;
+    // Integer PKs return the row id; TEXT (sync-friendly) PKs keep their
+    // caller-supplied string id and report 0 (no meaningful int exists).
+    final idValue = r['id'];
+    if (idValue is int) return idValue;
+    if (idValue is num) return idValue.toInt();
+    return 0;
   }
 
   @override
