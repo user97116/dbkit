@@ -1,3 +1,10 @@
+# 0.4.1
+
+- `MemoryAdapter.insert` supports TEXT primary keys: string ids (e.g.
+  sync-friendly `newSyncId()` values from `dbkit_sync`) no longer throw a
+  cast error — the row is stored and `insert` reports `0` (no meaningful
+  integer row id exists; use your caller-supplied id).
+
 # 0.4.0
 
 - Simplified API (breaking): removed exact-duplicate aliases — use
